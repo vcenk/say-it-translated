@@ -58,10 +58,12 @@ const Hero = () => {
                 Start Free Trial
               </Button>
             </Link>
-            <Button variant="glass" size="xl">
-              <Upload className="w-5 h-5 mr-2" />
-              Try Demo
-            </Button>
+            <Link to="/app">
+              <Button variant="glass" size="xl">
+                <Upload className="w-5 h-5 mr-2" />
+                Try Demo
+              </Button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">

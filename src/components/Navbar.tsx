@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Menu, X, Headphones } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,8 +41,12 @@ const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost">Sign In</Button>
-            <Button variant="hero">Start Free Trial</Button>
+            <Link to="/auth">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link to="/auth">
+              <Button variant="hero">Start Free Trial</Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -68,8 +73,12 @@ const Navbar = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Button variant="ghost" className="justify-start">Sign In</Button>
-                <Button variant="hero" className="justify-start">Start Free Trial</Button>
+                <Link to="/auth" onClick={() => setIsOpen(false)}>
+                  <Button variant="ghost" className="justify-start w-full">Sign In</Button>
+                </Link>
+                <Link to="/auth" onClick={() => setIsOpen(false)}>
+                  <Button variant="hero" className="justify-start w-full">Start Free Trial</Button>
+                </Link>
               </div>
             </div>
           </div>
