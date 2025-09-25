@@ -52,6 +52,11 @@ const App = () => {
   const [uploading, setUploading] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -227,6 +232,146 @@ const App = () => {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 44100,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        } 
+      });
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      const chunks: Blob[] = [];
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        await handleRecordedAudio(audioBlob);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      setMediaRecorder(recorder);
+      setAudioChunks([]);
+      setRecordingTime(0);
+      
+      // Start recording timer
+      const interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setRecordingInterval(interval);
+      
+      recorder.start(1000); // Collect data every second
+      setRecording(true);
+      
+      toast({
+        title: "Recording started",
+        description: "Speak into your microphone. Click stop when finished.",
+      });
+      
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: "Recording failed",
+        description: "Could not access microphone. Please check permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      setRecording(false);
+      
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+      
+      toast({
+        title: "Recording stopped",
+        description: "Processing your audio for transcription...",
+      });
+    }
+  };
+
+  const handleRecordedAudio = async (audioBlob: Blob) => {
+    setUploading(true);
+    
+    try {
+      // Create recording record
+      const { data: recordingData, error: recordingError } = await supabase
+        .from('recordings')
+        .insert({
+          original_filename: `recording_${new Date().getTime()}.webm`,
+          mime_type: 'audio/webm',
+          size_bytes: audioBlob.size,
+          status: 'uploading',
+          source: 'live_recording',
+          duration_sec: recordingTime
+        })
+        .select()
+        .single();
+
+      if (recordingError) throw recordingError;
+
+      // Upload to storage
+      const filePath = `${user?.id}/${recordingData.id}/recording.webm`;
+      const { error: uploadError } = await supabase.storage
+        .from('audio-uploads')
+        .upload(filePath, audioBlob);
+
+      if (uploadError) throw uploadError;
+
+      // Update with storage path
+      const { error: updateError } = await supabase
+        .from('recordings')
+        .update({ 
+          storage_path: filePath,
+          status: 'queued'
+        })
+        .eq('id', recordingData.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Recording saved",
+        description: "Your recording is ready for transcription.",
+      });
+
+      fetchRecordings();
+      
+      // Auto-start transcription
+      setTimeout(() => {
+        handleTranscribe(recordingData);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error saving recording:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save recording. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      setRecordingTime(0);
+    }
+  };
+
   const handleTranslate = async (targetLang: string) => {
     if (!transcript) return;
     
@@ -259,6 +404,12 @@ const App = () => {
     } finally {
       setTranslating(false);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -347,11 +498,15 @@ const App = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs defaultValue="upload" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="record" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="record" className="gap-2">
+              <Mic className="w-4 h-4" />
+              <span className="hidden sm:inline">Record Live</span>
+            </TabsTrigger>
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">Upload & Transcribe</span>
+              <span className="hidden sm:inline">Upload File</span>
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="w-4 h-4" />
@@ -362,6 +517,95 @@ const App = () => {
               <span className="hidden sm:inline">Translations</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="record" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mic className="w-5 h-5" />
+                  Live Recording
+                </CardTitle>
+                <CardDescription>
+                  Record audio directly from your microphone
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center space-y-6">
+                  <div className={`w-32 h-32 rounded-full mx-auto flex items-center justify-center ${
+                    recording ? 'bg-red-500/20 animate-pulse' : 'bg-primary/10'
+                  }`}>
+                    <Mic className={`w-16 h-16 ${recording ? 'text-red-500' : 'text-primary'}`} />
+                  </div>
+                  
+                  {recording && (
+                    <div className="space-y-2">
+                      <div className="text-2xl font-mono font-bold text-red-500">
+                        {formatTime(recordingTime)}
+                      </div>
+                      <div className="flex justify-center">
+                        <div className="flex space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-1 bg-red-500 rounded-full animate-pulse`}
+                              style={{
+                                height: `${Math.random() * 20 + 10}px`,
+                                animationDelay: `${i * 0.1}s`
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground">Recording in progress...</p>
+                    </div>
+                  )}
+                  
+                  {!recording && (
+                    <div className="space-y-4">
+                      <h3 className="text-xl font-semibold">Ready to Record</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        Click the record button below to start capturing audio from your microphone. 
+                        Make sure to allow microphone access when prompted.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-center gap-4">
+                    {!recording ? (
+                      <Button 
+                        size="lg" 
+                        onClick={startRecording}
+                        disabled={uploading}
+                        className="bg-red-500 hover:bg-red-600 text-white px-8"
+                      >
+                        <Mic className="w-5 h-5 mr-2" />
+                        Start Recording
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="lg" 
+                        variant="outline"
+                        onClick={stopRecording}
+                        className="border-red-500 text-red-500 hover:bg-red-50 px-8"
+                      >
+                        <Pause className="w-5 h-5 mr-2" />
+                        Stop Recording
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {uploading && (
+                    <div className="bg-muted p-4 rounded-lg">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-sm">Saving and processing recording...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="upload" className="space-y-6">
             <Card>
@@ -384,6 +628,13 @@ const App = () => {
                     </p>
                   </div>
                   <div className="mt-6">
+                    <Button 
+                      disabled={uploading} 
+                      onClick={() => document.getElementById('audio-upload')?.click()}
+                      className="cursor-pointer"
+                    >
+                      {uploading ? "Uploading..." : "Choose File"}
+                    </Button>
                     <input
                       type="file"
                       accept="audio/*"
@@ -392,11 +643,6 @@ const App = () => {
                       className="hidden"
                       id="audio-upload"
                     />
-                    <label htmlFor="audio-upload">
-                      <Button disabled={uploading} className="cursor-pointer">
-                        {uploading ? "Uploading..." : "Choose File"}
-                      </Button>
-                    </label>
                   </div>
                 </div>
               </CardContent>
