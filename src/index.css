@@ -2,41 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* EchoFlow Design System - Audio-focused theme with modern gradients and professional styling */
 
 @layer base {
   :root {
+    /* Core Brand Colors - Deep purples and blues with electric accents */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 230 15% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 230 15% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 230 15% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Deep electric blue */
+    --primary: 245 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 245 100% 75%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Soft purple accent */
+    --secondary: 270 30% 96%;
+    --secondary-foreground: 270 15% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Subtle grays */
+    --muted: 230 10% 96%;
+    --muted-foreground: 230 8% 50%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Electric purple */
+    --accent: 270 85% 65%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Audio-specific colors */
+    --audio-wave: 245 85% 60%;
+    --audio-recording: 0 85% 60%;
+    --audio-processing: 35 85% 60%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --border: 230 15% 92%;
+    --input: 230 15% 95%;
+    --ring: 245 85% 60%;
+
+    --radius: 0.75rem;
+
+    /* Brand Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(245 85% 60%) 0%, hsl(270 85% 65%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(230 30% 98%) 100%);
+    --gradient-audio: linear-gradient(90deg, hsl(245 85% 60%) 0%, hsl(270 85% 65%) 50%, hsl(245 85% 60%) 100%);
+    
+    /* Shadows with brand colors */
+    --shadow-brand: 0 4px 20px -2px hsl(245 85% 60% / 0.15);
+    --shadow-audio: 0 0 30px hsl(245 85% 60% / 0.3);
+    --shadow-glow: 0 0 50px hsl(270 85% 65% / 0.4);
+
+    /* Animation timings */
+    --animation-fast: 150ms ease-out;
+    --animation-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --animation-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --sidebar-background: 0 0% 98%;
 
@@ -56,33 +80,51 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode - Deep space theme with glowing accents */
+    --background: 230 25% 8%;
+    --foreground: 230 15% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 230 20% 10%;
+    --card-foreground: 230 15% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 230 20% 10%;
+    --popover-foreground: 230 15% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Primary stays bright for contrast */
+    --primary: 245 85% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 245 100% 80%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 230 15% 18%;
+    --secondary-foreground: 230 15% 85%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 230 15% 15%;
+    --muted-foreground: 230 8% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 270 85% 70%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Audio colors adjusted for dark mode */
+    --audio-wave: 245 85% 70%;
+    --audio-recording: 0 85% 65%;
+    --audio-processing: 35 85% 65%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 230 15% 20%;
+    --input: 230 15% 18%;
+    --ring: 245 85% 65%;
+
+    /* Dark gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(245 85% 65%) 0%, hsl(270 85% 70%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(230 20% 10%) 0%, hsl(230 25% 12%) 100%);
+    --gradient-audio: linear-gradient(90deg, hsl(245 85% 65%) 0%, hsl(270 85% 70%) 50%, hsl(245 85% 65%) 100%);
+
+    /* Enhanced shadows for dark mode */
+    --shadow-brand: 0 4px 25px -2px hsl(245 85% 65% / 0.25);
+    --shadow-audio: 0 0 40px hsl(245 85% 65% / 0.4);
+    --shadow-glow: 0 0 60px hsl(270 85% 70% / 0.5);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -100,6 +142,106 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer components {
+  /* Brand utility classes */
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .gradient-audio {
+    background: var(--gradient-audio);
+  }
+  
+  .shadow-brand {
+    box-shadow: var(--shadow-brand);
+  }
+  
+  .shadow-audio {
+    box-shadow: var(--shadow-audio);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Audio-specific components */
+  .audio-wave {
+    color: hsl(var(--audio-wave));
+  }
+  
+  .audio-recording {
+    color: hsl(var(--audio-recording));
+  }
+  
+  .audio-processing {
+    color: hsl(var(--audio-processing));
+  }
+
+  /* Interactive effects */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-brand;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  .hover-glow:hover {
+    @apply shadow-glow;
+  }
+
+  /* Animated backgrounds */
+  .animated-gradient {
+    background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary-glow)), hsl(var(--accent)));
+    background-size: 400% 400%;
+    animation: gradient-shift 8s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Waveform animation */
+  .waveform-bounce {
+    animation: waveform-bounce 1.5s ease-in-out infinite;
+  }
+
+  @keyframes waveform-bounce {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.5); }
+  }
+
+  /* Pulse animation for recording */
+  .recording-pulse {
+    animation: recording-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes recording-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+  }
+
+  /* Float animation for hero elements */
+  .float-animation {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
   }
 }
