@@ -1,42 +1,276 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, FileAudio, Globe, Download, Play, Pause, Mic, History, Settings, User, LogOut, Crown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Navigate } from "react-router-dom";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Mic, Upload, History, Settings, User, LogOut, Crown } from 'lucide-react';
+} from "@/components/ui/dropdown-menu";
 
-export default function App() {
+interface Recording {
+  id: string;
+  original_filename: string;
+  status: string;
+  created_at: string;
+  duration_sec?: number;
+  size_bytes?: number;
+}
+
+interface Transcript {
+  id: string;
+  text: string;
+  confidence: number;
+  language_detected: string;
+  created_at: string;
+}
+
+interface Translation {
+  id: string;
+  target_lang: string;
+  text: string;
+  created_at: string;
+}
+
+const App = () => {
   const { user, loading, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+  const [transcript, setTranscript] = useState<Transcript | null>(null);
+  const [translations, setTranslations] = useState<Translation[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
+    if (user) {
+      fetchRecordings();
     }
-  }, [user, loading, navigate]);
+  }, [user]);
+
+  const fetchRecordings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recordings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRecordings(data || []);
+    } catch (error) {
+      console.error('Error fetching recordings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch recordings",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchTranscript = async (recordingId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('transcripts')
+        .select('*')
+        .eq('recording_id', recordingId)
+        .single();
+
+      if (error) {
+        if (error.code !== 'PGRST116') { // Not found error
+          throw error;
+        }
+        setTranscript(null);
+        return;
+      }
+      
+      setTranscript(data);
+      fetchTranslations(data.id);
+    } catch (error) {
+      console.error('Error fetching transcript:', error);
+    }
+  };
+
+  const fetchTranslations = async (transcriptId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('translations')
+        .select('*')
+        .eq('transcript_id', transcriptId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTranslations(data || []);
+    } catch (error) {
+      console.error('Error fetching translations:', error);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/m4a', 'audio/webm'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an audio file (MP3, WAV, MP4, M4A, or WebM)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (200MB max for Pro tier, adjust based on subscription)
+    const maxSize = 200 * 1024 * 1024; // 200MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "File must be smaller than 200MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Create recording record first
+      const { data: recordingData, error: recordingError } = await supabase
+        .from('recordings')
+        .insert({
+          original_filename: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+          status: 'uploading',
+          source: 'upload'
+        })
+        .select()
+        .single();
+
+      if (recordingError) throw recordingError;
+
+      // Upload file to Supabase Storage
+      const filePath = `${user?.id}/${recordingData.id}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('audio-uploads')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Update recording with storage path
+      const { error: updateError } = await supabase
+        .from('recordings')
+        .update({ 
+          storage_path: filePath,
+          status: 'queued'
+        })
+        .eq('id', recordingData.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Upload successful",
+        description: "File uploaded successfully. Ready for transcription.",
+      });
+
+      fetchRecordings();
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleTranscribe = async (recording: Recording) => {
+    setTranscribing(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { recordingId: recording.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Transcription started",
+        description: "Your audio is being transcribed. This may take a few minutes.",
+      });
+
+      // Refresh recordings and fetch transcript
+      fetchRecordings();
+      setTimeout(() => fetchTranscript(recording.id), 2000);
+    } catch (error) {
+      console.error('Transcription error:', error);
+      toast({
+        title: "Transcription failed",
+        description: "Failed to start transcription. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const handleTranslate = async (targetLang: string) => {
+    if (!transcript) return;
+    
+    setTranslating(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('translate-text', {
+        body: { 
+          transcriptId: transcript.id,
+          targetLanguage: targetLang,
+          text: transcript.text
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Translation completed",
+        description: `Text translated to ${targetLang}`,
+      });
+
+      fetchTranslations(transcript.id);
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast({
+        title: "Translation failed",
+        description: "Failed to translate text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (!user) {
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   const userInitials = user.user_metadata?.full_name
@@ -71,7 +305,7 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="premium" size="sm" className="hidden md:inline-flex">
+              <Button variant="outline" size="sm" className="hidden md:inline-flex">
                 Upgrade to Pro
               </Button>
               
@@ -113,91 +347,190 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs defaultValue="record" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="record" className="gap-2">
-              <Mic className="w-4 h-4" />
-              <span className="hidden sm:inline">Record</span>
-            </TabsTrigger>
+        <Tabs defaultValue="upload" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">Upload</span>
+              <span className="hidden sm:inline">Upload & Transcribe</span>
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="w-4 h-4" />
               <span className="hidden sm:inline">History</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
+            <TabsTrigger value="translations" className="gap-2">
+              <Globe className="w-4 h-4" />
+              <span className="hidden sm:inline">Translations</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="record" className="space-y-6">
-            <div className="text-center">
-              <div className="bg-card rounded-2xl border border-border p-8 max-w-2xl mx-auto">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Mic className="w-8 h-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-bold mb-4">Record Audio</h2>
-                <p className="text-muted-foreground mb-6">
-                  Click the record button to start capturing audio from your microphone
-                </p>
-                <Button size="lg" className="gap-2">
-                  <Mic className="w-5 h-5" />
-                  Start Recording
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
           <TabsContent value="upload" className="space-y-6">
-            <div className="text-center">
-              <div className="bg-card rounded-2xl border border-border border-dashed p-8 max-w-2xl mx-auto">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Upload className="w-8 h-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-bold mb-4">Upload Audio</h2>
-                <p className="text-muted-foreground mb-6">
-                  Drag and drop your audio or video files here, or click to browse
-                </p>
-                <Button size="lg" variant="outline" className="gap-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <Upload className="w-5 h-5" />
-                  Choose Files
-                </Button>
-                <p className="text-sm text-muted-foreground mt-4">
-                  Supports MP3, WAV, M4A, MP4, and WEBM files up to 20MB
-                </p>
-              </div>
-            </div>
+                  Upload Audio File
+                </CardTitle>
+                <CardDescription>
+                  Upload an audio file to transcribe and translate
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
+                  <FileAudio className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <p className="text-lg font-medium">Drop your audio file here</p>
+                    <p className="text-sm text-muted-foreground">
+                      Supports MP3, WAV, MP4, M4A, WebM (max 200MB)
+                    </p>
+                  </div>
+                  <div className="mt-6">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      className="hidden"
+                      id="audio-upload"
+                    />
+                    <label htmlFor="audio-upload">
+                      <Button disabled={uploading} className="cursor-pointer">
+                        {uploading ? "Uploading..." : "Choose File"}
+                      </Button>
+                    </label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {selectedRecording && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileAudio className="w-5 h-5" />
+                    {selectedRecording.original_filename}
+                  </CardTitle>
+                  <CardDescription>
+                    Status: <Badge variant="outline">{selectedRecording.status}</Badge>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedRecording.status === 'queued' && (
+                    <Button 
+                      onClick={() => handleTranscribe(selectedRecording)}
+                      disabled={transcribing}
+                    >
+                      {transcribing ? "Transcribing..." : "Start Transcription"}
+                    </Button>
+                  )}
+                  
+                  {transcript && (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Transcript</h4>
+                        <div className="bg-muted p-4 rounded-lg">
+                          <p className="text-sm">{transcript.text}</p>
+                        </div>
+                        <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                          <span>Confidence: {Math.round(transcript.confidence * 100)}%</span>
+                          <span>Language: {transcript.language_detected}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleTranslate('es')}
+                          disabled={translating}
+                        >
+                          <Globe className="w-4 h-4 mr-2" />
+                          Translate to Spanish
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleTranslate('fr')}
+                          disabled={translating}
+                        >
+                          <Globe className="w-4 h-4 mr-2" />
+                          Translate to French
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-6">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                <History className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h2 className="text-2xl font-bold mb-4">No recordings yet</h2>
-              <p className="text-muted-foreground mb-6">
-                Your transcribed recordings will appear here
-              </p>
-              <Button variant="outline">
-                <Mic className="w-4 h-4 mr-2" />
-                Start your first recording
-              </Button>
-            </div>
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recording History</CardTitle>
+                <CardDescription>View all your uploaded recordings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {recordings.map((recording) => (
+                    <div 
+                      key={recording.id}
+                      className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedRecording(recording);
+                        fetchTranscript(recording.id);
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium">{recording.original_filename}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(recording.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{recording.status}</Badge>
+                    </div>
+                  ))}
+                  {recordings.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No recordings yet. Upload your first audio file!
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-6">
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-bold mb-6">Settings</h2>
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <p className="text-muted-foreground">Settings panel coming soon...</p>
-              </div>
-            </div>
+          <TabsContent value="translations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Translations</CardTitle>
+                <CardDescription>View all your translations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {translations.map((translation) => (
+                    <div key={translation.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline">{translation.target_lang.toUpperCase()}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(translation.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm">{translation.text}</p>
+                    </div>
+                  ))}
+                  {translations.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No translations yet. Transcribe an audio file and translate it!
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
     </div>
   );
-}
+};
+
+export default App;
