@@ -127,13 +127,16 @@ const Pricing = () => {
                   )}
                 </div>
 
-                <Button 
-                  variant={plan.popular ? "hero" : "outline"} 
-                  className="w-full"
-                  size="lg"
+                <a 
+                  href="/auth"
+                  className={`inline-block w-full text-center px-8 py-3 rounded-lg font-medium transition-colors ${
+                    plan.popular 
+                      ? "bg-gradient-hero text-white shadow-brand hover:shadow-glow hover:scale-105 transition-all duration-300" 
+                      : "border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                  }`}
                 >
                   {plan.cta}
-                </Button>
+                </a>
               </div>
             );
           })}
