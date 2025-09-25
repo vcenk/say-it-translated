@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Play, Upload, Languages, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-waveform.jpg";
 
 const Hero = () => {
@@ -51,12 +52,12 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <a href="/auth" className="inline-block">
+            <Link to="/auth">
               <Button variant="hero" size="xl" className="group">
                 <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                 Start Free Trial
               </Button>
-            </a>
+            </Link>
             <Button variant="glass" size="xl">
               <Upload className="w-5 h-5 mr-2" />
               Try Demo
