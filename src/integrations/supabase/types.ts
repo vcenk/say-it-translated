@@ -14,7 +14,265 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_log: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          id: string
+          meta: Json | null
+          target_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          id?: string
+          meta?: Json | null
+          target_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          id?: string
+          meta?: Json | null
+          target_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          default_target_lang: string | null
+          full_name: string | null
+          id: string
+          role: string | null
+          tz: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          default_target_lang?: string | null
+          full_name?: string | null
+          id: string
+          role?: string | null
+          tz?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          default_target_lang?: string | null
+          full_name?: string | null
+          id?: string
+          role?: string | null
+          tz?: string | null
+        }
+        Relationships: []
+      }
+      recordings: {
+        Row: {
+          created_at: string | null
+          deepgram_request_id: string | null
+          duration_sec: number | null
+          error_message: string | null
+          id: string
+          mime_type: string | null
+          original_filename: string | null
+          size_bytes: number | null
+          source: string
+          status: string | null
+          storage_path: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deepgram_request_id?: string | null
+          duration_sec?: number | null
+          error_message?: string | null
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
+          source: string
+          status?: string | null
+          storage_path?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deepgram_request_id?: string | null
+          duration_sec?: number | null
+          error_message?: string | null
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
+          source?: string
+          status?: string | null
+          storage_path?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      stripe_customers: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          price_id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          price_id: string
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          price_id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      transcripts: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          id: string
+          language_detected: string | null
+          recording_id: string | null
+          segments: Json | null
+          text: string | null
+          words: Json | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          language_detected?: string | null
+          recording_id?: string | null
+          segments?: Json | null
+          text?: string | null
+          words?: Json | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          language_detected?: string | null
+          recording_id?: string | null
+          segments?: Json | null
+          text?: string | null
+          words?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcripts_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "recordings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      translations: {
+        Row: {
+          created_at: string | null
+          id: string
+          model: string
+          target_lang: string
+          text: string
+          transcript_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          model: string
+          target_lang: string
+          text: string
+          transcript_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          model?: string
+          target_lang?: string
+          text?: string
+          transcript_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translations_transcript_id_fkey"
+            columns: ["transcript_id"]
+            isOneToOne: false
+            referencedRelation: "transcripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_counters: {
+        Row: {
+          created_at: string | null
+          id: string
+          period_end: string
+          period_start: string
+          stt_seconds_used: number | null
+          translate_chars_used: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          period_end: string
+          period_start: string
+          stt_seconds_used?: number | null
+          translate_chars_used?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          stt_seconds_used?: number | null
+          translate_chars_used?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
